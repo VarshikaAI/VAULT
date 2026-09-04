@@ -5,12 +5,6 @@
 
 function notifyBridge(payload: unknown) {
   window.postMessage({ source: "vault-main", payload }, "*");
-}
-
-// --- Sensitive API interception -------------------------------------------
-
-const originalReadText = navigator.clipboard?.readText?.bind(navigator.clipboard);
-if (originalReadText) {
   navigator.clipboard.readText = async function () {
     notifyBridge({ kind: "sensitive_api", api: "clipboard_read" });
     return originalReadText();
@@ -36,8 +30,37 @@ function classifyField(
   if (/^\d{3}-?\d{2}-?\d{4}$/.test(el.value)) return "government_id";
   return "generic_text";
 }
+// --- Pre-emptive protection: analyze BEFORE the user types -------------
 
 document.addEventListener(
+  "focusin",
+  (e) => {
+    const field = e.target as HTMLInputElement;
+
+    if (!(field instanceof HTMLInputElement)) return;
+
+    const fieldType = classifyField(field);
+
+    // Only trigger for fields that Vault can identify as sensitive.
+    if (
+      fieldType !== "credential" &&
+      fieldType !== "payment_card" &&
+      fieldType !== "government_id"
+    ) {
+      return;
+    }
+
+    // Send ONLY the field type — never the actual value.
+    notifyBridge({
+      kind: "field_focus",
+      fieldType,
+    });
+  },
+  true
+);
+
+document.addEventListener(
+  
   "submit",
   (e) => {
     const form = e.target as HTMLFormElement;

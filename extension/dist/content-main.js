@@ -3,9 +3,6 @@
   // src/content-main.ts
   function notifyBridge(payload) {
     window.postMessage({ source: "vault-main", payload }, "*");
-  }
-  var originalReadText = navigator.clipboard?.readText?.bind(navigator.clipboard);
-  if (originalReadText) {
     navigator.clipboard.readText = async function() {
       notifyBridge({ kind: "sensitive_api", api: "clipboard_read" });
       return originalReadText();
@@ -23,6 +20,22 @@
     if (/^\d{3}-?\d{2}-?\d{4}$/.test(el.value)) return "government_id";
     return "generic_text";
   }
+  document.addEventListener(
+    "focusin",
+    (e) => {
+      const field = e.target;
+      if (!(field instanceof HTMLInputElement)) return;
+      const fieldType = classifyField(field);
+      if (fieldType !== "credential" && fieldType !== "payment_card" && fieldType !== "government_id") {
+        return;
+      }
+      notifyBridge({
+        kind: "field_focus",
+        fieldType
+      });
+    },
+    true
+  );
   document.addEventListener(
     "submit",
     (e) => {

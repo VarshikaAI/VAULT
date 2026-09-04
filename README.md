@@ -7,12 +7,12 @@ cd backend
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt --break-system-packages
 cp .env.example .env   # paste your Featherless API key into .env
-uvicorn main:app --reload --port 8010
+uvicorn main:app --reload --port 8020
 ```
 
 Test it:
 ```bash
-curl -X POST http://localhost:8010/analyze \
+curl -X POST http://localhost:8020/analyze \
   -H "Content-Type: application/json" \
   -d '{"redirect_chain": ["site-a.com", "ads.track.net", "fake-site.xyz"], "session_events": [{"type": "clipboard_read", "hop": 2}], "outbound_data": {"field_type": "credential", "action": "form_submit"}}'
 ```

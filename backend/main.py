@@ -101,7 +101,18 @@ User's stated privacy preference: "{req.user_privacy_preference}"
 
 Weigh the redirect chain length, what is being accessed or submitted, and the user's stated
 preference together. The same action can be fine in one context and risky in another —
-judge this specific situation, don't apply a fixed rule."""
+judge this specific situation, don't apply a fixed rule. Also include a "possible_impact" field: one plain-English sentence
+predicting the realistic consequence IF this data were actually shared,
+grounded only in the signals given (redirect chain length, field type,
+domain reputation) — do not invent specifics you weren't given.
+
+Respond as JSON:
+{
+  "action": "allow" | "warn" | "block",
+  "reason": "...",
+  "possible_impact": "...",
+  "confidence": "high" | "medium" | "low"
+}"""
 
 
 @app.post("/analyze", response_model=AnalyzeResponse)
@@ -134,26 +145,45 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     return AnalyzeResponse(verdict=verdict, reason=reason, cached=False)
 
 
-@app.post("/privacy-report")
-def privacy_report(req: AnalyzeRequest) -> dict:
-    events_desc = "\n".join(f"- {e.type}" for e in req.session_events) or "no notable events"
-    chain_desc = " -> ".join(req.redirect_chain) if req.redirect_chain else "direct visit"
-
-    prompt = f"""Summarize this browsing session's privacy exposure in exactly 3 plain-English
-sentences for a non-technical user. Be specific about what was requested or shared and by whom.
-
-Redirect chain: {chain_desc}
-Events: {events_desc}"""
-
-    completion = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=150,
-        temperature=0.4,
-    )
-    return {"report": (completion.choices[0].message.content or "").strip()}
-
-
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.post("/privacy-report")
+def privacy_report(req: AnalyzeRequest) -> dict:
+    prompt = f"""You are generating a privacy report for a browsing session. Base everything
+strictly on the data given — do not invent details not present below.
+
+Redirect chain: {req.redirect_chain}
+Session events: {[event.model_dump() for event in req.session_events]}
+
+Respond as JSON only, no other text:
+{{
+  "risk_level": "low" | "medium" | "high",
+  "summary": "2-3 sentence plain-English overview of what happened in this session",
+  "key_findings": ["short bullet 1", "short bullet 2", "short bullet 3"],
+  "possible_impact": "one sentence on what could realistically happen if data had been shared",
+  "recommendation": "one concrete, actionable sentence for the user"
+}}"""
+
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=300,
+        temperature=0.3,
+    )
+    raw = (response.choices[0].message.content or "").strip()
+    raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        parsed = {
+            "risk_level": "medium",
+            "summary": raw,
+            "key_findings": [],
+            "possible_impact": "",
+            "recommendation": "",
+        }
+    return parsed

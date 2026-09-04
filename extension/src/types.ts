@@ -26,9 +26,19 @@ export interface AnalyzeResponse {
 }
 
 export type BridgeMessage =
-  | { kind: "sensitive_api"; api: "clipboard_read" | "clipboard_write" | "canvas_fingerprint" }
-  | { kind: "field_submit"; fieldType: FieldType };
-
+  | {
+      kind: "sensitive_api";
+      api: "clipboard_read" | "clipboard_write" | "canvas_fingerprint";
+    }
+  | {
+      kind: "field_focus";
+      fieldType: FieldType;
+    }
+  | {
+      kind: "field_submit";
+      fieldType: FieldType;
+    };
+    
 export interface TabSession {
   redirectChain: string[];
   events: SessionEvent[];

@@ -2,31 +2,53 @@
 (() => {
   // src/sidepanel.ts
   var feed = document.getElementById("feed");
-  var reportBtn = document.getElementById("reportBtn");
   var reportDiv = document.getElementById("report");
   chrome.runtime.onMessage.addListener((message) => {
-    if (message.kind !== "session_update") return;
-    const { session, verdict } = message;
-    const row = document.createElement("div");
-    row.className = "event";
-    const last = session.events[session.events.length - 1];
-    row.textContent = `${session.redirectChain.join(" -> ") || "direct"} | ${last?.type ?? ""} ${verdict ? `-> ${verdict.verdict}: ${verdict.reason}` : ""}`;
-    feed.prepend(row);
+    if (message.kind === "privacy_report_update") {
+      renderPrivacyReport(message.report);
+      reportDiv.textContent = "Automatically updated";
+    }
+    if (message.kind === "session_update") {
+      renderSessionEvent(message.session);
+      reportDiv.textContent = "Generating automatic report...";
+    }
+    if (message.kind === "privacy_report_error") {
+      reportDiv.textContent = "Report unavailable. Start the backend and try another activity.";
+    }
   });
-  reportBtn.addEventListener("click", async () => {
+  function renderPrivacyReport(report) {
+    const el = document.getElementById("privacy-report");
+    if (!el) return;
+    el.className = `risk-${report.risk_level || "medium"}`;
+    const findings = (report.key_findings || []).map((f) => `<li>${f}</li>`).join("");
+    el.innerHTML = `
+    <div class="report-risk-badge">${(report.risk_level || "medium").toUpperCase()} RISK</div>
+    <div class="report-summary">${report.summary || ""}</div>
+    ${findings ? `<ul class="report-findings">${findings}</ul>` : ""}
+    ${report.possible_impact ? `<div class="report-impact">\u26A0\uFE0F ${report.possible_impact}</div>` : ""}
+    ${report.recommendation ? `<div class="report-recommendation">\u{1F4A1} ${report.recommendation}</div>` : ""}
+  `;
+  }
+  function renderSessionEvent(session) {
+    const feed2 = document.getElementById("session-feed");
+    if (!feed2 || !session.events?.length) return;
+    const last = session.events[session.events.length - 1];
+    const item = document.createElement("div");
+    item.className = "feed-event";
+    item.innerHTML = `<span class="feed-event-type">${last.type}</span><span class="feed-event-hop">hop ${last.hop}</span>`;
+    feed2.prepend(item);
+  }
+  async function loadCurrentSession() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
     const session = await chrome.runtime.sendMessage({ kind: "get_session", tabId: tab.id });
-    reportDiv.textContent = "Generating...";
-    const res = await fetch("http://localhost:8010/privacy-report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        redirect_chain: session.redirectChain,
-        session_events: session.events,
-        user_privacy_preference: "warn me before sharing anything sensitive"
-      })
-    });
-    const data = await res.json();
-    reportDiv.textContent = data.report;
+    if (session.latestReport) renderPrivacyReport(session.latestReport);
+    if (session.events?.length) {
+      reportDiv.textContent = "Automatically updated";
+      renderSessionEvent(session);
+    }
+  }
+  loadCurrentSession().catch(() => {
+    reportDiv.textContent = "Waiting for browsing activity...";
   });
 })();
