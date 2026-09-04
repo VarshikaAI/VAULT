@@ -3,6 +3,9 @@
   // src/content-main.ts
   function notifyBridge(payload) {
     window.postMessage({ source: "vault-main", payload }, "*");
+  }
+  var originalReadText = navigator.clipboard?.readText?.bind(navigator.clipboard);
+  if (navigator.clipboard && originalReadText) {
     navigator.clipboard.readText = async function() {
       notifyBridge({ kind: "sensitive_api", api: "clipboard_read" });
       return originalReadText();
@@ -40,8 +43,8 @@
     "submit",
     (e) => {
       const form = e.target;
-      const sensitiveInput = form.querySelector(
-        "input[type=password], input[autocomplete*='cc-']"
+      const sensitiveInput = Array.from(form.querySelectorAll("input")).find(
+        (input) => classifyField(input) !== "generic_text"
       );
       if (!sensitiveInput) return;
       e.preventDefault();

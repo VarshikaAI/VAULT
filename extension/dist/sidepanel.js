@@ -16,17 +16,29 @@
       reportDiv.textContent = "Report unavailable. Start the backend and try another activity.";
     }
   });
+  function escapeHtml(value) {
+    return value.replace(
+      /[&<>'"]/g,
+      (character) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;"
+      })[character] ?? character
+    );
+  }
   function renderPrivacyReport(report) {
     const el = document.getElementById("privacy-report");
     if (!el) return;
     el.className = `risk-${report.risk_level || "medium"}`;
-    const findings = (report.key_findings || []).map((f) => `<li>${f}</li>`).join("");
+    const findings = (report.key_findings || []).map((finding) => `<li>${escapeHtml(finding)}</li>`).join("");
     el.innerHTML = `
     <div class="report-risk-badge">${(report.risk_level || "medium").toUpperCase()} RISK</div>
-    <div class="report-summary">${report.summary || ""}</div>
+    <div class="report-summary">${escapeHtml(report.summary || "")}</div>
     ${findings ? `<ul class="report-findings">${findings}</ul>` : ""}
-    ${report.possible_impact ? `<div class="report-impact">\u26A0\uFE0F ${report.possible_impact}</div>` : ""}
-    ${report.recommendation ? `<div class="report-recommendation">\u{1F4A1} ${report.recommendation}</div>` : ""}
+    ${report.possible_impact ? `<div class="report-impact">\u26A0\uFE0F ${escapeHtml(report.possible_impact)}</div>` : ""}
+    ${report.recommendation ? `<div class="report-recommendation">\u{1F4A1} ${escapeHtml(report.recommendation)}</div>` : ""}
   `;
   }
   function renderSessionEvent(session) {

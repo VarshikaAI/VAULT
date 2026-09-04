@@ -3,7 +3,7 @@ import os
 import pathlib
 from typing import List, Literal, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
@@ -14,8 +14,6 @@ load_dotenv()
 FEATHERLESS_API_KEY = os.getenv("FEATHERLESS_API_KEY")
 MODEL = "Qwen/Qwen2.5-7B-Instruct"
 HISTORY_PATH = pathlib.Path(__file__).parent / "domain_history.json"
-
-client = OpenAI(api_key=FEATHERLESS_API_KEY, base_url="https://api.featherless.ai/v1")
 
 app = FastAPI(title="Vault backend")
 app.add_middleware(
@@ -34,7 +32,7 @@ class SessionEvent(BaseModel):
 
 
 class OutboundData(BaseModel):
-    field_type: Literal["credential", "payment_card", "government_id", "generic_text"]
+    field_type: Literal["credential", "payment_card", "government_id", "generic_text", "consent"]
     action: str
 
 
@@ -51,6 +49,12 @@ class AnalyzeResponse(BaseModel):
     verdict: Literal["ALLOW", "WARN", "BLOCK"]
     reason: str
     cached: bool = False
+
+
+def get_client() -> OpenAI:
+    if not FEATHERLESS_API_KEY or FEATHERLESS_API_KEY.startswith("replace-with"):
+        raise HTTPException(status_code=503, detail="FEATHERLESS_API_KEY is not configured")
+    return OpenAI(api_key=FEATHERLESS_API_KEY, base_url="https://api.featherless.ai/v1")
 
 
 def load_history() -> dict:
@@ -106,9 +110,9 @@ predicting the realistic consequence IF this data were actually shared,
 grounded only in the signals given (redirect chain length, field type,
 domain reputation) — do not invent specifics you weren't given.
 
-Respond as JSON:
+Respond as JSON with this exact schema:
 {
-  "action": "allow" | "warn" | "block",
+    "verdict": "ALLOW" | "WARN" | "BLOCK",
   "reason": "...",
   "possible_impact": "...",
   "confidence": "high" | "medium" | "low"
@@ -124,7 +128,7 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
         return AnalyzeResponse(verdict=cached["verdict"], reason=cached["reason"], cached=True)
 
     prompt = build_prompt(req)
-    completion = client.chat.completions.create(
+    completion = get_client().chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=200,
@@ -135,7 +139,9 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     try:
         cleaned = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         parsed = json.loads(cleaned)
-        verdict = parsed["verdict"]
+        verdict = str(parsed.get("verdict", "")).upper()
+        if verdict not in {"ALLOW", "WARN", "BLOCK"}:
+            raise ValueError("Model returned an invalid verdict")
         reason = parsed["reason"]
     except Exception:
         verdict, reason = "WARN", "Could not fully parse the model's response, defaulting to a cautious warning."
@@ -167,7 +173,7 @@ Respond as JSON only, no other text:
   "recommendation": "one concrete, actionable sentence for the user"
 }}"""
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=300,

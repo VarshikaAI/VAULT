@@ -25,6 +25,14 @@ export interface AnalyzeResponse {
   cached: boolean;
 }
 
+export interface PrivacyReport {
+  risk_level?: "low" | "medium" | "high";
+  summary?: string;
+  key_findings?: string[];
+  possible_impact?: string;
+  recommendation?: string;
+}
+
 export type BridgeMessage =
   | {
       kind: "sensitive_api";
@@ -42,4 +50,5 @@ export type BridgeMessage =
 export interface TabSession {
   redirectChain: string[];
   events: SessionEvent[];
+  latestReport?: PrivacyReport;
 }

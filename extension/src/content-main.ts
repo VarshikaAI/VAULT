@@ -5,6 +5,10 @@
 
 function notifyBridge(payload: unknown) {
   window.postMessage({ source: "vault-main", payload }, "*");
+}
+
+const originalReadText = navigator.clipboard?.readText?.bind(navigator.clipboard);
+if (navigator.clipboard && originalReadText) {
   navigator.clipboard.readText = async function () {
     notifyBridge({ kind: "sensitive_api", api: "clipboard_read" });
     return originalReadText();
@@ -64,8 +68,8 @@ document.addEventListener(
   "submit",
   (e) => {
     const form = e.target as HTMLFormElement;
-    const sensitiveInput = form.querySelector<HTMLInputElement>(
-      "input[type=password], input[autocomplete*='cc-']"
+    const sensitiveInput = Array.from(form.querySelectorAll<HTMLInputElement>("input")).find(
+      (input) => classifyField(input) !== "generic_text"
     );
     if (!sensitiveInput) return; // nothing sensitive in this form, let it through
 

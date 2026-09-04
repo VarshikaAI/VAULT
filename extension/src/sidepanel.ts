@@ -1,3 +1,5 @@
+import type { PrivacyReport, TabSession } from "./types";
+
 const feed = document.getElementById("feed")!;
 const reportDiv = document.getElementById("report")!;
 
@@ -15,25 +17,37 @@ const reportDiv = document.getElementById("report")!;
   }
 });
 
-function renderPrivacyReport(report) {
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'"]/g, (character) =>
+    ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;",
+    })[character] ?? character
+  );
+}
+
+function renderPrivacyReport(report: PrivacyReport) {
   const el = document.getElementById("privacy-report");
   if (!el) return;
 
   el.className = `risk-${report.risk_level || "medium"}`;
   const findings = (report.key_findings || [])
-    .map((f) => `<li>${f}</li>`)
+    .map((finding) => `<li>${escapeHtml(finding)}</li>`)
     .join("");
 
   el.innerHTML = `
     <div class="report-risk-badge">${(report.risk_level || "medium").toUpperCase()} RISK</div>
-    <div class="report-summary">${report.summary || ""}</div>
+    <div class="report-summary">${escapeHtml(report.summary || "")}</div>
     ${findings ? `<ul class="report-findings">${findings}</ul>` : ""}
-    ${report.possible_impact ? `<div class="report-impact">⚠️ ${report.possible_impact}</div>` : ""}
-    ${report.recommendation ? `<div class="report-recommendation">💡 ${report.recommendation}</div>` : ""}
+    ${report.possible_impact ? `<div class="report-impact">⚠️ ${escapeHtml(report.possible_impact)}</div>` : ""}
+    ${report.recommendation ? `<div class="report-recommendation">💡 ${escapeHtml(report.recommendation)}</div>` : ""}
   `;
 }
 
-function renderSessionEvent(session) {
+function renderSessionEvent(session: TabSession) {
   const feed = document.getElementById("session-feed");
   if (!feed || !session.events?.length) return;
   const last = session.events[session.events.length - 1];
