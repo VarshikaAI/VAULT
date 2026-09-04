@@ -1,0 +1,18 @@
+{
+  "fake-site.xyz:credential": {
+    "verdict": "WARN",
+    "reason": "The redirect chain involves multiple hops to an unfamiliar site, and a sensitive action like credential submission is about to occur, which aligns with the user's stated preference to be warned in such cases."
+  },
+  "github.com:credential": {
+    "verdict": "WARN",
+    "reason": "The redirect chain involves a less familiar intermediate site, and the user is submitting a sensitive credential field, which aligns with the user's preference to be warned in such cases."
+  },
+  "unknown:credential": {
+    "verdict": "WARN",
+    "reason": "The user is submitting a sensitive credential to a site they haven't visited before, which aligns with their stated privacy preference to be warned in such cases."
+  },
+  "codespectra.ai:credential": {
+    "verdict": "WARN",
+    "reason": "The user is submitting sensitive information to a site they haven't visited before, which aligns with their stated privacy preference to be warned in such cases."
+  }
+}

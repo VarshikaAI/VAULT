@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Vault - Real-Time AI Browsing Guardian",
+  "version": "0.1.0",
+  "description": "Watches your browsing session and warns before you share sensitive data with a risky site.",
+  "permissions": ["webNavigation", "storage", "sidePanel", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content-main.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content-bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Vault"
+  }
+}
